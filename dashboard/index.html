@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hydrogen Siting Dashboard — Regio Foodvalley</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg-primary: #f4f6f9;
+  --bg-card: #ffffff;
+  --bg-header: #0f2942;
+  --text-primary: #1c2733;
+  --text-secondary: #6b7686;
+  --text-on-dark: #ffffff;
+  --navy: #1F3864;
+  --blue: #2E4057;
+  --steel: #4472C4;
+  --red: #C0392B;
+  --amber: #D68910;
+  --green: #27964D;
+  --grey-line: #e3e7ed;
+  --gap: 16px;
+  --radius: 10px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg-primary); color:var(--text-primary); line-height:1.5; }
+.dashboard-container { max-width:1500px; margin:0 auto; padding:var(--gap); }
+
+.dashboard-header { background:linear-gradient(135deg,var(--bg-header),#1F3864); color:var(--text-on-dark); padding:22px 28px; border-radius:var(--radius); margin-bottom:var(--gap); display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; }
+.dashboard-header h1 { font-size:22px; font-weight:700; margin-bottom:4px; }
+.dashboard-header p { font-size:13px; color:rgba(255,255,255,0.75); }
+.filters { display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; }
+.filter-group { display:flex; flex-direction:column; gap:4px; }
+.filter-group label { font-size:11px; color:rgba(255,255,255,0.65); text-transform:uppercase; letter-spacing:0.5px; }
+.filter-group select { padding:7px 10px; border:1px solid rgba(255,255,255,0.25); border-radius:6px; background:rgba(255,255,255,0.12); color:#fff; font-size:13px; min-width:150px; }
+.filter-group select option { background:#0f2942; color:#fff; }
+.reset-btn { padding:7px 14px; border-radius:6px; border:1px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.08); color:#fff; font-size:12px; cursor:pointer; align-self:flex-end; }
+.reset-btn:hover { background:rgba(255,255,255,0.2); }
+
+.kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:var(--gap); margin-bottom:var(--gap); }
+.kpi-card { background:var(--bg-card); border-radius:var(--radius); padding:18px 20px; box-shadow:0 1px 3px rgba(0,0,0,0.07); border-left:4px solid var(--steel); }
+.kpi-card.warn { border-left-color:var(--red); }
+.kpi-card.good { border-left-color:var(--green); }
+.kpi-label { font-size:11.5px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; font-weight:600; }
+.kpi-value { font-size:26px; font-weight:700; color:var(--text-primary); margin-bottom:2px; }
+.kpi-sub { font-size:12px; color:var(--text-secondary); }
+
+/* --- Weight sensitivity panel (NEW) --- */
+.weight-panel { background:var(--bg-card); border-radius:var(--radius); padding:20px 24px; box-shadow:0 1px 3px rgba(0,0,0,0.07); margin-bottom:var(--gap); }
+.weight-panel h3 { font-size:14px; font-weight:700; margin-bottom:2px; }
+.weight-panel .subtitle { font-size:11.5px; color:var(--text-secondary); margin-bottom:16px; }
+.weight-controls { display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin-bottom:14px; }
+.slider-wrap { flex:1; min-width:280px; }
+.slider-wrap input[type=range] { width:100%; accent-color:var(--steel); height:6px; }
+.slider-labels { display:flex; justify-content:space-between; font-size:11.5px; color:var(--text-secondary); margin-top:4px; }
+.weight-readout { display:flex; gap:10px; }
+.weight-chip { padding:6px 12px; border-radius:20px; font-size:12.5px; font-weight:700; }
+.weight-chip.deficit { background:#4472C422; color:#2E4057; }
+.weight-chip.congestion { background:#8172B322; color:#5b4d99; }
+.stability-badge { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:600; }
+.stability-badge.stable { background:#27964D18; color:#1c6e3a; border:1px solid #27964D40; }
+.stability-badge.changed { background:#C0392B18; color:#8c2a1e; border:1px solid #C0392B40; }
+.wsi-note { font-size:11.5px; color:var(--text-secondary); margin-top:8px; }
+.preset-btns { display:flex; gap:8px; flex-wrap:wrap; }
+.preset-btn { padding:5px 11px; border-radius:6px; border:1px solid var(--grey-line); background:#fff; font-size:11.5px; cursor:pointer; color:var(--text-primary); }
+.preset-btn:hover { background:#f4f6f9; }
+.preset-btn.active { background:var(--steel); color:#fff; border-color:var(--steel); }
+
+.chart-row { display:grid; grid-template-columns:1.6fr 1fr; gap:var(--gap); margin-bottom:var(--gap); }
+.chart-row2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); margin-bottom:var(--gap); }
+.chart-container { background:var(--bg-card); border-radius:var(--radius); padding:18px 20px; box-shadow:0 1px 3px rgba(0,0,0,0.07); }
+.chart-container h3 { font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:4px; }
+.chart-container .subtitle { font-size:11.5px; color:var(--text-secondary); margin-bottom:14px; }
+.chart-container canvas { max-height:320px; }
+#map { height:320px; border-radius:6px; }
+
+.table-section { background:var(--bg-card); border-radius:var(--radius); padding:18px 20px; box-shadow:0 1px 3px rgba(0,0,0,0.07); overflow-x:auto; margin-bottom:var(--gap); }
+.table-section h3 { font-size:14px; font-weight:700; margin-bottom:4px; }
+.table-section .subtitle { font-size:11.5px; color:var(--text-secondary); margin-bottom:14px; }
+.data-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+.data-table thead th { text-align:left; padding:9px 10px; border-bottom:2px solid var(--grey-line); color:var(--text-secondary); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; white-space:nowrap; user-select:none; cursor:pointer; }
+.data-table thead th:hover { color:var(--text-primary); background:#f8f9fb; }
+.data-table tbody td { padding:8px 10px; border-bottom:1px solid #f1f2f5; white-space:nowrap; }
+.data-table tbody tr:hover { background:#f8f9fb; }
+.data-table tbody tr.top3 { background:#fff8e6; }
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; color:#fff; }
+.badge.RED { background:var(--red); }
+.badge.AMBER { background:var(--amber); }
+.badge.GREEN { background:var(--green); }
+.pager { display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:12px; color:var(--text-secondary); }
+.pager button { padding:5px 12px; border-radius:5px; border:1px solid var(--grey-line); background:#fff; cursor:pointer; font-size:12px; }
+.pager button:disabled { opacity:0.4; cursor:default; }
+
+.dashboard-footer { text-align:center; font-size:11.5px; color:var(--text-secondary); padding:14px 0; }
+
+@media (max-width:1000px) {
+  .chart-row, .chart-row2 { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<div class="dashboard-container">
+
+  <header class="dashboard-header">
+    <div>
+      <h1>Hydrogen Siting Dashboard — Regio Foodvalley</h1>
+      <p>Strategic locations for hydrogen conversion &amp; storage | ACT Team 3.695 | Source: hydrogen_siting_phase3_v2.csv</p>
+    </div>
+    <div class="filters">
+      <div class="filter-group">
+        <label>Municipality</label>
+        <select id="f-municipality" onchange="dash.applyFilters()"><option value="all">All</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Congestion</label>
+        <select id="f-congestion" onchange="dash.applyFilters()">
+          <option value="all">All</option>
+          <option value="RED">RED</option>
+          <option value="AMBER">AMBER</option>
+          <option value="GREEN">GREEN</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Balance Class</label>
+        <select id="f-balance" onchange="dash.applyFilters()">
+          <option value="all">All</option>
+          <option value="severe_deficit">Severe deficit</option>
+          <option value="high_deficit">High deficit</option>
+        </select>
+      </div>
+      <button class="reset-btn" onclick="dash.resetFilters()">Reset filters</button>
+    </div>
+  </header>
+
+  <section class="kpi-row">
+    <div class="kpi-card warn">
+      <div class="kpi-label">Regional Demand</div>
+      <div class="kpi-value">607.3 <span style="font-size:14px;">GWh/yr</span></div>
+      <div class="kpi-sub">across 7 municipalities</div>
+    </div>
+    <div class="kpi-card good">
+      <div class="kpi-label">Regional Renewable Supply</div>
+      <div class="kpi-value">206.6 <span style="font-size:14px;">GWh/yr</span></div>
+      <div class="kpi-sub">solar, wind &amp; rooftop PV</div>
+    </div>
+    <div class="kpi-card warn">
+      <div class="kpi-label">Regional Deficit</div>
+      <div class="kpi-value">&minus;400.7 <span style="font-size:14px;">GWh/yr</span></div>
+      <div class="kpi-sub">met via grid imports</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Self-Sufficiency</div>
+      <div class="kpi-value">34%</div>
+      <div class="kpi-sub">of demand met locally</div>
+    </div>
+    <div class="kpi-card good">
+      <div class="kpi-label">Top Candidate (report weighting)</div>
+      <div class="kpi-value" style="font-size:18px;">Harselaar Barneveld</div>
+      <div class="kpi-sub">composite score 0.75</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" id="kpi-filtered-label">Candidate Zones</div>
+      <div class="kpi-value" id="kpi-filtered-count">73</div>
+      <div class="kpi-sub">currently shown</div>
+    </div>
+  </section>
+
+  <!-- ==================== NEW: Weight-sensitivity panel ==================== -->
+  <section class="weight-panel">
+    <h3>Weight-sensitivity explorer</h3>
+    <div class="subtitle">
+      The report uses a fixed 50% energy-deficit / 50% grid-congestion split. Drag the slider to see whether the #1
+      recommendation survives a different weighting — every chart and the table below recompute live.
+    </div>
+    <div class="weight-controls">
+      <div class="weight-readout">
+        <span class="weight-chip deficit">Energy deficit: <span id="w-deficit-pct">50</span>%</span>
+        <span class="weight-chip congestion">Grid congestion: <span id="w-congestion-pct">50</span>%</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="weight-slider" min="0" max="100" value="50" step="1" oninput="dash.onWeightChange(this.value)">
+        <div class="slider-labels"><span>0% deficit / 100% congestion</span><span>100% deficit / 0% congestion</span></div>
+      </div>
+      <div class="preset-btns">
+        <button class="preset-btn active" id="preset-report" onclick="dash.setWeight(50)">Report (50/50)</button>
+        <button class="preset-btn" id="preset-entropy" onclick="dash.setWeight(88.5)">Entropy-derived (88/12)</button>
+        <button class="preset-btn" id="preset-critic" onclick="dash.setWeight(27.6)">CRITIC-derived (28/72)</button>
+      </div>
+    </div>
+    <div id="stability-badge" class="stability-badge stable">✓ Stable — Harselaar Barneveld (3771) is still #1</div>
+    <div class="wsi-note">
+      Exact Weight Stability Interval (derived in <code>src/sensitivity.py</code>): PC4 3771 (Harselaar) stays the #1-ranked
+      site for any deficit weight between <b>47%</b> and <b>100%</b>. Below 47% deficit weight (i.e. congestion-dominant
+      weighting), PC4 3901 (Nijverkamp, Veenendaal) — the only officially RED-congested top candidate — takes #1 instead.
+    </div>
+  </section>
+
+  <section class="chart-row">
+    <div class="chart-container">
+      <h3>Top 10 Candidate Locations</h3>
+      <div class="subtitle">Ranked by <span id="rank-chart-subtitle">composite siting score (50% deficit / 50% congestion)</span>, coloured by grid congestion status</div>
+      <canvas id="rankChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Congestion Status</h3>
+      <div class="subtitle">Across all filtered candidate zones</div>
+      <canvas id="congestionDoughnut"></canvas>
+    </div>
+  </section>
+
+  <section class="chart-row2">
+    <div class="chart-container">
+      <h3>Score Composition — Top 10</h3>
+      <div class="subtitle" id="stacked-subtitle">Energy Deficit Score (50%) + Grid Urgency Score (50%) = Composite Score</div>
+      <canvas id="stackedChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Geographic Overview</h3>
+      <div class="subtitle">14 geocoded PC4 zones — bubble size = deficit severity, colour = opportunity type</div>
+      <div id="map"></div>
+    </div>
+  </section>
+
+  <section class="chart-row2">
+    <div class="chart-container">
+      <h3>Municipality Energy Balance</h3>
+      <div class="subtitle">Annual demand vs. local renewable supply per municipality</div>
+      <canvas id="municipalityChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Self-Sufficiency by Municipality</h3>
+      <div class="subtitle">Share of electricity demand met by local renewables (regional average: 34%)</div>
+      <canvas id="selfSuffChart"></canvas>
+    </div>
+  </section>
+
+  <section class="table-section">
+    <h3>All Candidate Zones</h3>
+    <div class="subtitle">Click any column header to sort. Score column reflects the current slider weighting. Top 3 at current weighting highlighted.</div>
+    <div style="overflow-x:auto;">
+      <table class="data-table" id="detailTable">
+        <thead><tr>
+          <th data-field="liveRank">Rank</th>
+          <th data-field="pc4">PC4</th>
+          <th data-field="municipality">Municipality</th>
+          <th data-field="businessPark">Business Park</th>
+          <th data-field="demandSyntheticGwh">Demand (GWh)</th>
+          <th data-field="totalSupplyGwh">Supply (GWh)</th>
+          <th data-field="netBalanceP3Gwh">Net Balance (GWh)</th>
+          <th data-field="congestionStatus">Congestion</th>
+          <th data-field="liveScore">Score (live)</th>
+        </tr></thead>
+        <tbody id="detailTableBody"></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <span id="pager-info"></span>
+      <div>
+        <button id="pager-prev" onclick="dash.prevPage()">&larr; Prev</button>
+        <button id="pager-next" onclick="dash.nextPage()">Next &rarr;</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="dashboard-footer">
+    Hydrogen Siting Dashboard | Data: hydrogen_siting_phase3_v2.csv &amp; pc4_full_balance_gis.csv | Weight-sensitivity
+    panel added as a portfolio extension (src/sensitivity.py) | ACT Team 3.695, Wageningen University &amp; Research | June 2026
+  </footer>
+</div>
+
+<script>
+const DATA = {"kpis":{"regionalDemandGwh":607.3,"regionalSupplyGwh":206.6,"regionalDeficitGwh":-400.7,"selfSufficiencyPct":34.0,"totalCandidateZones":73,"topLocation":"Harselaar Barneveld","topScore":0.75},"municipalityBalance":[{"municipality":"Barneveld","demandGwh":81.7,"supplyGwh":120.9,"deficitGwh":-39.2,"selfSufficiencyPct":67.6},{"municipality":"Ede","demandGwh":216.7,"supplyGwh":79.5,"deficitGwh":-137.2,"selfSufficiencyPct":36.7},{"municipality":"Nijkerk","demandGwh":19.1,"supplyGwh":5.9,"deficitGwh":-13.1,"selfSufficiencyPct":31.1},{"municipality":"Renswoude","demandGwh":0.3,"supplyGwh":0.1,"deficitGwh":-0.3,"selfSufficiencyPct":16.1},{"municipality":"Rhenen","demandGwh":71.8,"supplyGwh":10.6,"deficitGwh":-61.2,"selfSufficiencyPct":14.8},{"municipality":"Veenendaal","demandGwh":104.5,"supplyGwh":4.1,"deficitGwh":-100.4,"selfSufficiencyPct":3.9},{"municipality":"Wageningen","demandGwh":74.1,"supplyGwh":24.7,"deficitGwh":-49.4,"selfSufficiencyPct":33.4}],"siting":[{"rank":1,"pc4":"3771","municipality":"Barneveld","businessPark":"Harselaar Barneveld","demandDsoGwh":34.1394,"demandSyntheticGwh":267.2994,"totalSupplyGwh":16.135,"netBalanceGwh":-23.3495,"netBalanceP3Gwh":-251.1644,"supplyRatioPct":40.8641,"balanceClass":"high_deficit","congestionStatus":"AMBER","congestionScore":0.5,"hasBizPark":true,"compositeSiting":0.75,"compositeSitingV1":0.6417},{"rank":2,"pc4":"3901","municipality":"Veenendaal","businessPark":"Nijverkamp Veenendaal","demandDsoGwh":27.5374,"demandSyntheticGwh":111.6334,"totalSupplyGwh":2.3198,"netBalanceGwh":-27.4928,"netBalanceP3Gwh":-109.3135,"supplyRatioPct":7.7814,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":true,"compositeSiting":0.7176,"compositeSitingV1":0.9613},{"rank":3,"pc4":"3903","municipality":"Veenendaal","businessPark":"De Compagnie Veenendaal","demandDsoGwh":18.739,"demandSyntheticGwh":64.771,"totalSupplyGwh":3.9394,"netBalanceGwh":-17.4946,"netBalanceP3Gwh":-60.8316,"supplyRatioPct":18.3791,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":true,"compositeSiting":0.621,"compositeSitingV1":0.7934},{"rank":4,"pc4":"6718","municipality":"Ede","businessPark":"BT A12/Schampsteeg Ede","demandDsoGwh":23.0006,"demandSyntheticGwh":50.6606,"totalSupplyGwh":6.3378,"netBalanceGwh":-19.7598,"netBalanceP3Gwh":-44.3228,"supplyRatioPct":24.2852,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":true,"compositeSiting":0.5882,"compositeSitingV1":0.8314},{"rank":5,"pc4":"6711","municipality":"Ede","businessPark":null,"demandDsoGwh":28.7235,"demandSyntheticGwh":29.8041,"totalSupplyGwh":4.1875,"netBalanceGwh":-25.6166,"netBalanceP3Gwh":-25.6166,"supplyRatioPct":14.0502,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5509,"compositeSitingV1":0.9298},{"rank":6,"pc4":"6717","municipality":"Ede","businessPark":null,"demandDsoGwh":25.9548,"demandSyntheticGwh":27.6632,"totalSupplyGwh":5.9819,"netBalanceGwh":-21.6813,"netBalanceP3Gwh":-21.6813,"supplyRatioPct":21.6242,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5431,"compositeSitingV1":0.8637},{"rank":7,"pc4":"3881","municipality":"Ede","businessPark":null,"demandDsoGwh":23.5832,"demandSyntheticGwh":26.3265,"totalSupplyGwh":5.0359,"netBalanceGwh":-21.2906,"netBalanceP3Gwh":-21.2906,"supplyRatioPct":19.1286,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5423,"compositeSitingV1":0.8571},{"rank":8,"pc4":"6721","municipality":"Veenendaal","businessPark":null,"demandDsoGwh":26.9452,"demandSyntheticGwh":27.7535,"totalSupplyGwh":7.3802,"netBalanceGwh":-20.3733,"netBalanceP3Gwh":-20.3733,"supplyRatioPct":26.592,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5405,"compositeSitingV1":0.8417},{"rank":9,"pc4":"6716","municipality":"Ede","businessPark":null,"demandDsoGwh":17.5285,"demandSyntheticGwh":19.834,"totalSupplyGwh":3.7519,"netBalanceGwh":-16.0821,"netBalanceP3Gwh":-16.0821,"supplyRatioPct":18.9166,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.532,"compositeSitingV1":0.7696},{"rank":10,"pc4":"3904","municipality":"Veenendaal","businessPark":null,"demandDsoGwh":21.5375,"demandSyntheticGwh":21.659,"totalSupplyGwh":6.2609,"netBalanceGwh":-15.3981,"netBalanceP3Gwh":-15.3981,"supplyRatioPct":28.9069,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5306,"compositeSitingV1":0.7581},{"rank":11,"pc4":"3841","municipality":"Ede","businessPark":"Harselaar (Ede side)","demandDsoGwh":15.292,"demandSyntheticGwh":16.2274,"totalSupplyGwh":1.8924,"netBalanceGwh":-14.335,"netBalanceP3Gwh":-14.335,"supplyRatioPct":11.6616,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":true,"compositeSiting":0.5285,"compositeSitingV1":0.7403},{"rank":12,"pc4":"6713","municipality":"Ede","businessPark":null,"demandDsoGwh":16.0032,"demandSyntheticGwh":16.2111,"totalSupplyGwh":2.8793,"netBalanceGwh":-13.3318,"netBalanceP3Gwh":-13.3318,"supplyRatioPct":17.7614,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5265,"compositeSitingV1":0.7234},{"rank":13,"pc4":"3902","municipality":"Veenendaal","businessPark":null,"demandDsoGwh":16.3278,"demandSyntheticGwh":16.7117,"totalSupplyGwh":4.0034,"netBalanceGwh":-12.7083,"netBalanceP3Gwh":-12.7083,"supplyRatioPct":23.9557,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5252,"compositeSitingV1":0.7129},{"rank":14,"pc4":"3846","municipality":"Ede","businessPark":null,"demandDsoGwh":11.4589,"demandSyntheticGwh":13.7974,"totalSupplyGwh":1.6341,"netBalanceGwh":-12.1632,"netBalanceP3Gwh":-12.1632,"supplyRatioPct":11.8438,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5242,"compositeSitingV1":0.7038},{"rank":15,"pc4":"6708","municipality":"Ede","businessPark":null,"demandDsoGwh":13.6455,"demandSyntheticGwh":14.2709,"totalSupplyGwh":3.9875,"netBalanceGwh":-10.2834,"netBalanceP3Gwh":-10.2834,"supplyRatioPct":27.9413,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5204,"compositeSitingV1":0.6722},{"rank":16,"pc4":"3844","municipality":"Ede","businessPark":null,"demandDsoGwh":12.2983,"demandSyntheticGwh":12.6856,"totalSupplyGwh":2.9212,"netBalanceGwh":-9.7644,"netBalanceP3Gwh":-9.7644,"supplyRatioPct":23.028,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5194,"compositeSitingV1":0.6635},{"rank":17,"pc4":"6701","municipality":"Ede","businessPark":null,"demandDsoGwh":9.0599,"demandSyntheticGwh":9.7096,"totalSupplyGwh":0.6264,"netBalanceGwh":-9.0833,"netBalanceP3Gwh":-9.0833,"supplyRatioPct":6.4508,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.518,"compositeSitingV1":0.652},{"rank":18,"pc4":"3891","municipality":"Ede","businessPark":"De Vallei Ede","demandDsoGwh":10.6828,"demandSyntheticGwh":11.4494,"totalSupplyGwh":2.6072,"netBalanceGwh":-8.8422,"netBalanceP3Gwh":-8.8422,"supplyRatioPct":22.7718,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":true,"compositeSiting":0.5175,"compositeSitingV1":0.648},{"rank":19,"pc4":"6714","municipality":"Ede","businessPark":null,"demandDsoGwh":10.0801,"demandSyntheticGwh":10.1259,"totalSupplyGwh":1.6102,"netBalanceGwh":-8.5157,"netBalanceP3Gwh":-8.5157,"supplyRatioPct":15.9022,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5169,"compositeSitingV1":0.6425},{"rank":20,"pc4":"3842","municipality":"Ede","businessPark":null,"demandDsoGwh":10.1679,"demandSyntheticGwh":10.4583,"totalSupplyGwh":2.0411,"netBalanceGwh":-8.4172,"netBalanceP3Gwh":-8.4172,"supplyRatioPct":19.5166,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5167,"compositeSitingV1":0.6409},{"rank":21,"pc4":"6732","municipality":"Veenendaal","businessPark":null,"demandDsoGwh":9.21,"demandSyntheticGwh":10.4995,"totalSupplyGwh":2.377,"netBalanceGwh":-8.1224,"netBalanceP3Gwh":-8.1224,"supplyRatioPct":22.6397,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5161,"compositeSitingV1":0.6359},{"rank":22,"pc4":"3843","municipality":"Ede","businessPark":null,"demandDsoGwh":9.2481,"demandSyntheticGwh":9.5813,"totalSupplyGwh":2.0214,"netBalanceGwh":-7.5599,"netBalanceP3Gwh":-7.5599,"supplyRatioPct":21.0973,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.515,"compositeSitingV1":0.6265},{"rank":23,"pc4":"6715","municipality":"Ede","businessPark":null,"demandDsoGwh":9.6415,"demandSyntheticGwh":9.7374,"totalSupplyGwh":2.3087,"netBalanceGwh":-7.4287,"netBalanceP3Gwh":-7.4287,"supplyRatioPct":23.7095,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5147,"compositeSitingV1":0.6242},{"rank":24,"pc4":"3907","municipality":"Veenendaal","businessPark":null,"demandDsoGwh":10.0141,"demandSyntheticGwh":10.0779,"totalSupplyGwh":3.7582,"netBalanceGwh":-6.3197,"netBalanceP3Gwh":-6.3197,"supplyRatioPct":37.2913,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5125,"compositeSitingV1":0.6056},{"rank":25,"pc4":"3893","municipality":"Ede","businessPark":null,"demandDsoGwh":9.4517,"demandSyntheticGwh":9.5633,"totalSupplyGwh":3.3945,"netBalanceGwh":-6.1688,"netBalanceP3Gwh":-6.1688,"supplyRatioPct":35.4953,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5122,"compositeSitingV1":0.6031},{"rank":26,"pc4":"3849","municipality":"Ede","businessPark":null,"demandDsoGwh":7.8457,"demandSyntheticGwh":7.984,"totalSupplyGwh":2.0427,"netBalanceGwh":-5.9413,"netBalanceP3Gwh":-5.9413,"supplyRatioPct":25.5847,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5118,"compositeSitingV1":0.5993},{"rank":27,"pc4":"6731","municipality":"Veenendaal","businessPark":null,"demandDsoGwh":7.0982,"demandSyntheticGwh":7.5267,"totalSupplyGwh":1.6775,"netBalanceGwh":-5.8492,"netBalanceP3Gwh":-5.8492,"supplyRatioPct":22.2868,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5116,"compositeSitingV1":0.5977},{"rank":28,"pc4":"6707","municipality":"Ede","businessPark":null,"demandDsoGwh":6.7218,"demandSyntheticGwh":6.8651,"totalSupplyGwh":1.2012,"netBalanceGwh":-5.6638,"netBalanceP3Gwh":-5.6638,"supplyRatioPct":17.4977,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5112,"compositeSitingV1":0.5946},{"rank":29,"pc4":"6712","municipality":"Ede","businessPark":null,"demandDsoGwh":7.2142,"demandSyntheticGwh":7.3277,"totalSupplyGwh":1.835,"netBalanceGwh":-5.4927,"netBalanceP3Gwh":-5.4927,"supplyRatioPct":25.0419,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5109,"compositeSitingV1":0.5917},{"rank":30,"pc4":"3894","municipality":"Ede","businessPark":null,"demandDsoGwh":8.9559,"demandSyntheticGwh":8.958,"totalSupplyGwh":3.5025,"netBalanceGwh":-5.4555,"netBalanceP3Gwh":-5.4555,"supplyRatioPct":39.0993,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5108,"compositeSitingV1":0.5911},{"rank":31,"pc4":"6702","municipality":"Ede","businessPark":null,"demandDsoGwh":6.0282,"demandSyntheticGwh":6.4664,"totalSupplyGwh":1.1123,"netBalanceGwh":-5.3542,"netBalanceP3Gwh":-5.3542,"supplyRatioPct":17.2005,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5106,"compositeSitingV1":0.5894},{"rank":32,"pc4":"3906","municipality":"Veenendaal","businessPark":null,"demandDsoGwh":9.0652,"demandSyntheticGwh":9.0715,"totalSupplyGwh":3.7858,"netBalanceGwh":-5.2857,"netBalanceP3Gwh":-5.2857,"supplyRatioPct":41.733,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5105,"compositeSitingV1":0.5882},{"rank":33,"pc4":"6733","municipality":"Veenendaal","businessPark":null,"demandDsoGwh":6.8613,"demandSyntheticGwh":7.1676,"totalSupplyGwh":1.8516,"netBalanceGwh":-5.316,"netBalanceP3Gwh":-5.316,"supplyRatioPct":25.8332,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5105,"compositeSitingV1":0.5888},{"rank":34,"pc4":"3892","municipality":"Ede","businessPark":null,"demandDsoGwh":8.0029,"demandSyntheticGwh":8.0758,"totalSupplyGwh":2.7881,"netBalanceGwh":-5.2878,"netBalanceP3Gwh":-5.2878,"supplyRatioPct":34.5237,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5105,"compositeSitingV1":0.5883},{"rank":35,"pc4":"3899","municipality":"Ede","businessPark":null,"demandDsoGwh":2.0046,"demandSyntheticGwh":5.0736,"totalSupplyGwh":0.3589,"netBalanceGwh":-4.7147,"netBalanceP3Gwh":-4.7147,"supplyRatioPct":7.0742,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5093,"compositeSitingV1":0.5787},{"rank":36,"pc4":"6706","municipality":"Ede","businessPark":null,"demandDsoGwh":5.6756,"demandSyntheticGwh":5.7137,"totalSupplyGwh":1.4507,"netBalanceGwh":-4.263,"netBalanceP3Gwh":-4.263,"supplyRatioPct":25.3899,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5084,"compositeSitingV1":0.5711},{"rank":37,"pc4":"3848","municipality":"Ede","businessPark":null,"demandDsoGwh":5.5877,"demandSyntheticGwh":5.6486,"totalSupplyGwh":1.6498,"netBalanceGwh":-3.9988,"netBalanceP3Gwh":-3.9988,"supplyRatioPct":29.2072,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5079,"compositeSitingV1":0.5666},{"rank":38,"pc4":"6709","municipality":"Ede","businessPark":null,"demandDsoGwh":5.5774,"demandSyntheticGwh":5.9309,"totalSupplyGwh":2.3469,"netBalanceGwh":-3.584,"netBalanceP3Gwh":-3.584,"supplyRatioPct":39.5703,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5071,"compositeSitingV1":0.5597},{"rank":39,"pc4":"6703","municipality":"Ede","businessPark":null,"demandDsoGwh":4.256,"demandSyntheticGwh":4.2714,"totalSupplyGwh":1.1581,"netBalanceGwh":-3.1133,"netBalanceP3Gwh":-3.1133,"supplyRatioPct":27.112,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5061,"compositeSitingV1":0.5517},{"rank":40,"pc4":"3821","municipality":"Ede","businessPark":null,"demandDsoGwh":0.6718,"demandSyntheticGwh":2.8579,"totalSupplyGwh":0.0561,"netBalanceGwh":-2.8018,"netBalanceP3Gwh":-2.8018,"supplyRatioPct":1.9638,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5055,"compositeSitingV1":0.5465},{"rank":41,"pc4":"3896","municipality":"Ede","businessPark":null,"demandDsoGwh":3.1102,"demandSyntheticGwh":4.223,"totalSupplyGwh":1.6135,"netBalanceGwh":-2.6095,"netBalanceP3Gwh":-2.6095,"supplyRatioPct":38.2077,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5051,"compositeSitingV1":0.5433},{"rank":42,"pc4":"6705","municipality":"Ede","businessPark":null,"demandDsoGwh":3.1157,"demandSyntheticGwh":3.1901,"totalSupplyGwh":0.7091,"netBalanceGwh":-2.4811,"netBalanceP3Gwh":-2.4811,"supplyRatioPct":22.227,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5049,"compositeSitingV1":0.5411},{"rank":43,"pc4":"3898","municipality":"Ede","businessPark":"Industriegebied Nijkerk","demandDsoGwh":2.9366,"demandSyntheticGwh":3.1586,"totalSupplyGwh":1.0496,"netBalanceGwh":-2.1091,"netBalanceP3Gwh":-2.1091,"supplyRatioPct":33.2283,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":true,"compositeSiting":0.5041,"compositeSitingV1":0.5349},{"rank":44,"pc4":"3847","municipality":"Ede","businessPark":null,"demandDsoGwh":1.7953,"demandSyntheticGwh":1.9221,"totalSupplyGwh":0.1898,"netBalanceGwh":-1.7323,"netBalanceP3Gwh":-1.7323,"supplyRatioPct":9.8741,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5034,"compositeSitingV1":0.5285},{"rank":45,"pc4":"6704","municipality":"Ede","businessPark":null,"demandDsoGwh":1.3176,"demandSyntheticGwh":1.352,"totalSupplyGwh":0.3478,"netBalanceGwh":-1.0042,"netBalanceP3Gwh":-1.0042,"supplyRatioPct":25.7225,"balanceClass":"high_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5019,"compositeSitingV1":0.5163},{"rank":46,"pc4":"3815","municipality":"Ede","businessPark":null,"demandDsoGwh":0.0708,"demandSyntheticGwh":0.8775,"totalSupplyGwh":0.0,"netBalanceGwh":-0.8775,"netBalanceP3Gwh":-0.8775,"supplyRatioPct":0.0,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5017,"compositeSitingV1":0.5142},{"rank":47,"pc4":"3895","municipality":"Ede","businessPark":null,"demandDsoGwh":0.4023,"demandSyntheticGwh":0.4485,"totalSupplyGwh":0.0285,"netBalanceGwh":-0.42,"netBalanceP3Gwh":-0.42,"supplyRatioPct":6.3517,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5008,"compositeSitingV1":0.5065},{"rank":48,"pc4":"3829","municipality":"Ede","businessPark":null,"demandDsoGwh":0.1964,"demandSyntheticGwh":0.3254,"totalSupplyGwh":0.0245,"netBalanceGwh":-0.3009,"netBalanceP3Gwh":-0.3009,"supplyRatioPct":7.5199,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5005,"compositeSitingV1":0.5045},{"rank":49,"pc4":"3826","municipality":"Ede","businessPark":null,"demandDsoGwh":0.058,"demandSyntheticGwh":0.1495,"totalSupplyGwh":0.0144,"netBalanceGwh":-0.1352,"netBalanceP3Gwh":-0.1352,"supplyRatioPct":9.6098,"balanceClass":"severe_deficit","congestionStatus":"RED","congestionScore":1.0,"hasBizPark":false,"compositeSiting":0.5002,"compositeSitingV1":0.5017},{"rank":50,"pc4":"3772","municipality":"Barneveld","businessPark":null,"demandDsoGwh":30.5729,"demandSyntheticGwh":31.4691,"totalSupplyGwh":9.4721,"netBalanceGwh":-21.997,"netBalanceP3Gwh":-21.997,"supplyRatioPct":30.0998,"balanceClass":"high_deficit","congestionStatus":"AMBER","congestionScore":0.5,"hasBizPark":false,"compositeSiting":0.2937,"compositeSitingV1":0.619},{"rank":51,"pc4":"3781","municipality":"Barneveld","businessPark":null,"demandDsoGwh":24.5328,"demandSyntheticGwh":25.7775,"totalSupplyGwh":7.3766,"netBalanceGwh":-18.401,"netBalanceP3Gwh":-18.401,"supplyRatioPct":28.6162,"balanceClass":"high_deficit","congestionStatus":"AMBER","congestionScore":0.5,"hasBizPark":false,"compositeSiting":0.2866,"compositeSitingV1":0.5586},{"rank":52,"pc4":"3776","municipality":"Barneveld","businessPark":null,"demandDsoGwh":5.1255,"demandSyntheticGwh":5.6,"totalSupplyGwh":1.4981,"netBalanceGwh":-4.102,"netBalanceP3Gwh":-4.102,"supplyRatioPct":26.7512,"balanceClass":"high_deficit","congestionStatus":"AMBER","congestionScore":0.5,"hasBizPark":false,"compositeSiting":0.2581,"compositeSitingV1":0.3184},{"rank":53,"pc4":"3784","municipality":"Barneveld","businessPark":null,"demandDsoGwh":4.3057,"demandSyntheticGwh":4.5313,"totalSupplyGwh":1.4108,"netBalanceGwh":-3.1205,"netBalanceP3Gwh":-3.1205,"supplyRatioPct":31.1353,"balanceClass":"high_deficit","congestionStatus":"AMBER","congestionScore":0.5,"hasBizPark":false,"compositeSiting":0.2561,"compositeSitingV1":0.3019},{"rank":54,"pc4":"3785","municipality":"Barneveld","businessPark":null,"demandDsoGwh":3.5352,"demandSyntheticGwh":3.6004,"totalSupplyGwh":1.2608,"netBalanceGwh":-2.3396,"netBalanceP3Gwh":-2.3396,"supplyRatioPct":35.0185,"balanceClass":"high_deficit","congestionStatus":"AMBER","congestionScore":0.5,"hasBizPark":false,"compositeSiting":0.2546,"compositeSitingV1":0.2887},{"rank":55,"pc4":"3794","municipality":"Barneveld","businessPark":null,"demandDsoGwh":1.723,"demandSyntheticGwh":1.8026,"totalSupplyGwh":0.5534,"netBalanceGwh":-1.2492,"netBalanceP3Gwh":-1.2492,"supplyRatioPct":30.6981,"balanceClass":"high_deficit","congestionStatus":"AMBER","congestionScore":0.5,"hasBizPark":false,"compositeSiting":0.2524,"compositeSitingV1":0.2704},{"rank":56,"pc4":"3775","municipality":"Barneveld","businessPark":null,"demandDsoGwh":1.1119,"demandSyntheticGwh":1.1456,"totalSupplyGwh":0.3906,"netBalanceGwh":-0.755,"netBalanceP3Gwh":-0.755,"supplyRatioPct":34.0974,"balanceClass":"high_deficit","congestionStatus":"AMBER","congestionScore":0.5,"hasBizPark":false,"compositeSiting":0.2514,"compositeSitingV1":0.2621},{"rank":57,"pc4":"3792","municipality":"Barneveld","businessPark":null,"demandDsoGwh":0.5302,"demandSyntheticGwh":0.5347,"totalSupplyGwh":0.2194,"netBalanceGwh":-0.3153,"netBalanceP3Gwh":-0.3153,"supplyRatioPct":41.0346,"balanceClass":"high_deficit","congestionStatus":"AMBER","congestionScore":0.5,"hasBizPark":false,"compositeSiting":0.2506,"compositeSitingV1":0.2547},{"rank":58,"pc4":"3861","municipality":"Nijkerk","businessPark":"A12 Business Zone Ede","demandDsoGwh":25.8618,"demandSyntheticGwh":62.0118,"totalSupplyGwh":6.9084,"netBalanceGwh":-23.3994,"netBalanceP3Gwh":-55.1035,"supplyRatioPct":22.794,"balanceClass":"severe_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":true,"compositeSiting":0.2096,"compositeSitingV1":0.4926},{"rank":59,"pc4":"3882","municipality":"Rhenen","businessPark":"Remmerden Rhenen","demandDsoGwh":27.9176,"demandSyntheticGwh":50.9336,"totalSupplyGwh":9.2859,"netBalanceGwh":-20.3509,"netBalanceP3Gwh":-41.6477,"supplyRatioPct":31.3324,"balanceClass":"high_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":true,"compositeSiting":0.1829,"compositeSitingV1":0.4413},{"rank":60,"pc4":"3851","municipality":"Wageningen","businessPark":"Nudepark Wageningen","demandDsoGwh":24.3944,"demandSyntheticGwh":39.1094,"totalSupplyGwh":5.2174,"netBalanceGwh":-21.7517,"netBalanceP3Gwh":-33.892,"supplyRatioPct":19.346,"balanceClass":"severe_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":true,"compositeSiting":0.1674,"compositeSitingV1":0.4649},{"rank":61,"pc4":"3911","municipality":"Rhenen","businessPark":null,"demandDsoGwh":36.7519,"demandSyntheticGwh":38.2848,"totalSupplyGwh":8.4899,"netBalanceGwh":-29.7949,"netBalanceP3Gwh":-29.7949,"supplyRatioPct":22.1755,"balanceClass":"severe_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1593,"compositeSitingV1":0.6},{"rank":62,"pc4":"6741","municipality":"Wageningen","businessPark":null,"demandDsoGwh":34.567,"demandSyntheticGwh":36.5083,"totalSupplyGwh":9.9917,"netBalanceGwh":-26.5166,"netBalanceP3Gwh":-26.5166,"supplyRatioPct":27.3682,"balanceClass":"high_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1527,"compositeSitingV1":0.5449},{"rank":63,"pc4":"3871","municipality":"Nijkerk","businessPark":null,"demandDsoGwh":19.053,"demandSyntheticGwh":19.8447,"totalSupplyGwh":5.2441,"netBalanceGwh":-14.6007,"netBalanceP3Gwh":-14.6007,"supplyRatioPct":26.4255,"balanceClass":"high_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.129,"compositeSitingV1":0.3447},{"rank":64,"pc4":"3853","municipality":"Wageningen","businessPark":null,"demandDsoGwh":16.8733,"demandSyntheticGwh":17.2757,"totalSupplyGwh":4.8111,"netBalanceGwh":-12.4647,"netBalanceP3Gwh":-12.4647,"supplyRatioPct":27.8486,"balanceClass":"high_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1248,"compositeSitingV1":0.3089},{"rank":65,"pc4":"3852","municipality":"Wageningen","businessPark":null,"demandDsoGwh":12.5759,"demandSyntheticGwh":13.5258,"totalSupplyGwh":3.1364,"netBalanceGwh":-10.3895,"netBalanceP3Gwh":-10.3895,"supplyRatioPct":23.1879,"balanceClass":"severe_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1206,"compositeSitingV1":0.274},{"rank":66,"pc4":"3863","municipality":"Nijkerk","businessPark":null,"demandDsoGwh":10.6827,"demandSyntheticGwh":10.9007,"totalSupplyGwh":3.0735,"netBalanceGwh":-7.8271,"netBalanceP3Gwh":-7.8271,"supplyRatioPct":28.1959,"balanceClass":"high_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1155,"compositeSitingV1":0.2309},{"rank":67,"pc4":"3864","municipality":"Nijkerk","businessPark":null,"demandDsoGwh":9.5506,"demandSyntheticGwh":9.7586,"totalSupplyGwh":2.7388,"netBalanceGwh":-7.0198,"netBalanceP3Gwh":-7.0198,"supplyRatioPct":28.0657,"balanceClass":"high_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1139,"compositeSitingV1":0.2174},{"rank":68,"pc4":"6744","municipality":"Rhenen","businessPark":null,"demandDsoGwh":7.9107,"demandSyntheticGwh":8.8184,"totalSupplyGwh":2.5047,"netBalanceGwh":-6.3137,"netBalanceP3Gwh":-6.3137,"supplyRatioPct":28.403,"balanceClass":"high_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1125,"compositeSitingV1":0.2055},{"rank":69,"pc4":"3886","municipality":"Rhenen","businessPark":null,"demandDsoGwh":6.4193,"demandSyntheticGwh":6.7275,"totalSupplyGwh":1.3447,"netBalanceGwh":-5.3827,"netBalanceP3Gwh":-5.3827,"supplyRatioPct":19.9888,"balanceClass":"severe_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1107,"compositeSitingV1":0.1899},{"rank":70,"pc4":"6745","municipality":"Rhenen","businessPark":null,"demandDsoGwh":1.7085,"demandSyntheticGwh":1.8165,"totalSupplyGwh":0.4572,"netBalanceGwh":-1.3593,"netBalanceP3Gwh":-1.3593,"supplyRatioPct":25.1679,"balanceClass":"high_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1026,"compositeSitingV1":0.1223},{"rank":71,"pc4":"3912","municipality":"Rhenen","businessPark":null,"demandDsoGwh":0.7225,"demandSyntheticGwh":0.7225,"totalSupplyGwh":0.178,"netBalanceGwh":-0.5444,"netBalanceP3Gwh":-0.5444,"supplyRatioPct":24.6431,"balanceClass":"severe_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.101,"compositeSitingV1":0.1086},{"rank":72,"pc4":"3937","municipality":"Renswoude","businessPark":null,"demandDsoGwh":0.1303,"demandSyntheticGwh":0.1303,"totalSupplyGwh":0.027,"netBalanceGwh":-0.1032,"netBalanceP3Gwh":-0.1032,"supplyRatioPct":20.7459,"balanceClass":"severe_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1001,"compositeSitingV1":0.1012},{"rank":73,"pc4":"3727","municipality":"Renswoude","businessPark":null,"demandDsoGwh":0.0461,"demandSyntheticGwh":0.0461,"totalSupplyGwh":0.013,"netBalanceGwh":-0.0331,"netBalanceP3Gwh":-0.0331,"supplyRatioPct":28.1744,"balanceClass":"high_deficit","congestionStatus":"GREEN","congestionScore":0.2,"hasBizPark":false,"compositeSiting":0.1,"compositeSitingV1":0.1}],"geo":[{"pc4":"3911","municipality":"Rhenen","demandGwh":45.5321,"totalSupplyGwh":8.4899,"netBalanceGwh":-37.0422,"supplyRatioPct":18.6459,"lat":51.957,"lon":5.573,"balanceClass":"severe_deficit","h2OpportunityType":"buffering","anomaly":false},{"pc4":"3905","municipality":"Veenendaal","demandGwh":37.0989,"totalSupplyGwh":6.1592,"netBalanceGwh":-30.9397,"supplyRatioPct":16.6022,"lat":52.031,"lon":5.542,"balanceClass":"severe_deficit","h2OpportunityType":"buffering","anomaly":false},{"pc4":"3772","municipality":"Barneveld","demandGwh":38.7829,"totalSupplyGwh":9.4721,"netBalanceGwh":-29.3108,"supplyRatioPct":24.4235,"lat":52.131,"lon":5.605,"balanceClass":"severe_deficit","h2OpportunityType":"buffering","anomaly":false},{"pc4":"3771","municipality":"Barneveld","demandGwh":42.3664,"totalSupplyGwh":16.6542,"netBalanceGwh":-25.7122,"supplyRatioPct":39.3099,"lat":52.147,"lon":5.592,"balanceClass":"severe_deficit","h2OpportunityType":"buffering","anomaly":false},{"pc4":"3903","municipality":"Veenendaal","demandGwh":23.0048,"totalSupplyGwh":3.9394,"netBalanceGwh":-19.0655,"supplyRatioPct":17.1241,"lat":52.023,"lon":5.556,"balanceClass":"high_deficit","h2OpportunityType":"buffering","anomaly":false},{"pc4":"3927","municipality":"Renswoude","demandGwh":20.2568,"totalSupplyGwh":5.5191,"netBalanceGwh":-14.7377,"supplyRatioPct":27.2458,"lat":52.076,"lon":5.535,"balanceClass":"severe_deficit","h2OpportunityType":"buffering","anomaly":false},{"pc4":"6708","municipality":"Ede","demandGwh":17.4973,"totalSupplyGwh":10.2123,"netBalanceGwh":-7.285,"supplyRatioPct":58.3651,"lat":51.969,"lon":5.664,"balanceClass":"high_deficit","h2OpportunityType":"buffering","anomaly":false},{"pc4":"3776","municipality":"Barneveld","demandGwh":6.1602,"totalSupplyGwh":1.4981,"netBalanceGwh":-4.6621,"supplyRatioPct":24.3185,"lat":52.115,"lon":5.572,"balanceClass":"moderate_deficit","h2OpportunityType":"hybrid","anomaly":false},{"pc4":"3773","municipality":"Barneveld","demandGwh":5.085,"totalSupplyGwh":1.3636,"netBalanceGwh":-3.7214,"supplyRatioPct":26.8155,"lat":52.11,"lon":5.618,"balanceClass":"moderate_deficit","h2OpportunityType":"hybrid","anomaly":false},{"pc4":"6718","municipality":"Ede","demandGwh":25.7908,"totalSupplyGwh":23.9192,"netBalanceGwh":-1.8716,"supplyRatioPct":92.7432,"lat":52.023,"lon":5.691,"balanceClass":"moderate_deficit","h2OpportunityType":"hybrid","anomaly":false},{"pc4":"3775","municipality":"Barneveld","demandGwh":1.3162,"totalSupplyGwh":4.7268,"netBalanceGwh":3.4106,"supplyRatioPct":359.1276,"lat":52.159,"lon":5.632,"balanceClass":"surplus","h2OpportunityType":"electrolysis","anomaly":false},{"pc4":"3774","municipality":"Barneveld","demandGwh":18.99,"totalSupplyGwh":34.264,"netBalanceGwh":15.274,"supplyRatioPct":180.4317,"lat":52.181,"lon":5.614,"balanceClass":"surplus","h2OpportunityType":"electrolysis","anomaly":false},{"pc4":"3882","municipality":"Rhenen","demandGwh":34.5142,"totalSupplyGwh":88.7391,"netBalanceGwh":54.2249,"supplyRatioPct":257.1086,"lat":51.964,"lon":5.58,"balanceClass":"surplus","h2OpportunityType":"electrolysis","anomaly":false},{"pc4":"3925","municipality":"Scherpenzeel","demandGwh":5.6053,"totalSupplyGwh":130.3321,"netBalanceGwh":124.7268,"supplyRatioPct":2325.1554,"lat":52.095,"lon":5.488,"balanceClass":"surplus","h2OpportunityType":"electrolysis","anomaly":true}]};
+
+const COLORS = { RED:'#C0392B', AMBER:'#D68910', GREEN:'#27964D' };
+const OPP_COLORS = { electrolysis:'#4472C4', buffering:'#C0392B', hybrid:'#8172B3' };
+
+function fmt(v, d=1) { return Number(v).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}); }
+
+class Dashboard {
+  constructor(data) {
+    this.raw = data.siting;
+    this.geo = data.geo;
+    this.municipalityBalance = data.municipalityBalance;
+    this.page = 0;
+    this.pageSize = 15;
+    this.sortField = 'liveRank';
+    this.sortDir = 'asc';
+    this.charts = {};
+
+    // --- NEW: derive each row's underlying deficit/congestion components so the
+    // slider can recompute composite_siting = w1*deficit + (1-w1)*congestion live,
+    // without needing to re-run the Python pipeline. Since compositeSiting =
+    // 0.5*deficitScore + 0.5*congestionScore in the report, deficitScore is
+    // exactly recoverable as 2*compositeSiting - congestionScore.
+    this.raw.forEach(r => {
+      r.deficitScore = 2 * r.compositeSiting - r.congestionScore;
+    });
+    this.baselineTop1Pc4 = [...this.raw].sort((a,b) => b.compositeSiting - a.compositeSiting)[0].pc4;
+
+    this.weightDeficit = 0.5; // 0..1, slider state
+    this.recomputeLiveScores();
+    this.filtered = this.raw;
+    this.init();
+  }
+
+  init() {
+    this.populateMunicipalityFilter();
+    this.renderRankChart();
+    this.renderCongestionDoughnut();
+    this.renderStackedChart();
+    this.renderMunicipalityChart();
+    this.renderSelfSuffChart();
+    this.renderMap();
+    this.bindSort();
+    this.renderTable();
+  }
+
+  // ---------- NEW: weight-sensitivity logic ----------
+  recomputeLiveScores() {
+    const w1 = this.weightDeficit;
+    this.raw.forEach(r => {
+      r.liveScore = Math.round((w1 * r.deficitScore + (1 - w1) * r.congestionScore) * 10000) / 10000;
+    });
+    const ranked = [...this.raw].sort((a,b) => b.liveScore - a.liveScore);
+    ranked.forEach((r, i) => r.liveRank = i + 1);
+  }
+
+  onWeightChange(sliderVal) {
+    this.weightDeficit = Number(sliderVal) / 100;
+    document.getElementById('w-deficit-pct').textContent = Math.round(this.weightDeficit * 100);
+    document.getElementById('w-congestion-pct').textContent = Math.round((1 - this.weightDeficit) * 100);
+    document.getElementById('rank-chart-subtitle').textContent =
+      `composite siting score (${Math.round(this.weightDeficit*100)}% deficit / ${Math.round((1-this.weightDeficit)*100)}% congestion)`;
+    document.getElementById('stacked-subtitle').textContent =
+      `Energy Deficit Score (${Math.round(this.weightDeficit*100)}%) + Grid Urgency Score (${Math.round((1-this.weightDeficit)*100)}%) = Composite Score`;
+
+    this.updatePresetHighlight(Number(sliderVal));
+    this.recomputeLiveScores();
+    this.updateStabilityBadge();
+    this.renderRankChart();
+    this.renderStackedChart();
+    this.renderTable();
+  }
+
+  setWeight(pct) {
+    document.getElementById('weight-slider').value = pct;
+    this.onWeightChange(pct);
+  }
+
+  updatePresetHighlight(sliderVal) {
+    const near = (a, b) => Math.abs(a - b) < 0.6;
+    document.getElementById('preset-report').classList.toggle('active', near(sliderVal, 50));
+    document.getElementById('preset-entropy').classList.toggle('active', near(sliderVal, 88.5));
+    document.getElementById('preset-critic').classList.toggle('active', near(sliderVal, 27.6));
+  }
+
+  updateStabilityBadge() {
+    const top1 = [...this.raw].sort((a,b) => b.liveScore - a.liveScore)[0];
+    const badge = document.getElementById('stability-badge');
+    if (top1.pc4 === this.baselineTop1Pc4) {
+      badge.className = 'stability-badge stable';
+      badge.textContent = `✓ Stable — Harselaar Barneveld (${this.baselineTop1Pc4}) is still #1`;
+    } else {
+      badge.className = 'stability-badge changed';
+      badge.textContent = `⚠ Changed — new #1 site: ${top1.pc4} ${top1.businessPark || top1.municipality} (score ${top1.liveScore.toFixed(3)})`;
+    }
+  }
+
+  populateMunicipalityFilter() {
+    const sel = document.getElementById('f-municipality');
+    const munis = [...new Set(this.raw.map(r => r.municipality))].sort();
+    munis.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m; opt.textContent = m;
+      sel.appendChild(opt);
+    });
+  }
+
+  applyFilters() {
+    const muni = document.getElementById('f-municipality').value;
+    const cong = document.getElementById('f-congestion').value;
+    const bal = document.getElementById('f-balance').value;
+    this.filtered = this.raw.filter(r => {
+      if (muni !== 'all' && r.municipality !== muni) return false;
+      if (cong !== 'all' && r.congestionStatus !== cong) return false;
+      if (bal !== 'all' && r.balanceClass !== bal) return false;
+      return true;
+    });
+    this.page = 0;
+    document.getElementById('kpi-filtered-count').textContent = this.filtered.length;
+    document.getElementById('kpi-filtered-label').textContent = (muni==='all'&&cong==='all'&&bal==='all') ? 'Candidate Zones' : 'Filtered Zones';
+    this.renderRankChart();
+    this.renderCongestionDoughnut();
+    this.renderStackedChart();
+    this.renderTable();
+  }
+
+  resetFilters() {
+    document.getElementById('f-municipality').value = 'all';
+    document.getElementById('f-congestion').value = 'all';
+    document.getElementById('f-balance').value = 'all';
+    this.applyFilters();
+  }
+
+  top10() {
+    return [...this.filtered].sort((a,b) => b.liveScore - a.liveScore).slice(0,10);
+  }
+
+  renderRankChart() {
+    const top = this.top10();
+    const labels = top.map(r => r.businessPark || (r.pc4 + ' ' + r.municipality));
+    const values = top.map(r => r.liveScore);
+    const colors = top.map(r => COLORS[r.congestionStatus]);
+    if (this.charts.rank) this.charts.rank.destroy();
+    this.charts.rank = new Chart(document.getElementById('rankChart').getContext('2d'), {
+      type: 'bar',
+      data: { labels, datasets: [{ label:'Composite Score', data: values, backgroundColor: colors, borderRadius:4 }] },
+      options: {
+        responsive:true, maintainAspectRatio:false, indexAxis:'y',
+        plugins: {
+          legend: { display:false },
+          tooltip: { callbacks: { label: c => `Score: ${c.parsed.x.toFixed(3)}` } }
+        },
+        scales: { x: { beginAtZero:true, max:1, grid:{ color:'#eef0f3' } }, y: { grid:{ display:false } } }
+      }
+    });
+  }
+
+  renderCongestionDoughnut() {
+    const counts = { RED:0, AMBER:0, GREEN:0 };
+    this.filtered.forEach(r => counts[r.congestionStatus]++);
+    if (this.charts.doughnut) this.charts.doughnut.destroy();
+    this.charts.doughnut = new Chart(document.getElementById('congestionDoughnut').getContext('2d'), {
+      type:'doughnut',
+      data: { labels:['RED','AMBER','GREEN'], datasets:[{ data:[counts.RED,counts.AMBER,counts.GREEN], backgroundColor:[COLORS.RED,COLORS.AMBER,COLORS.GREEN], borderColor:'#fff', borderWidth:2 }] },
+      options: { responsive:true, maintainAspectRatio:false, cutout:'60%',
+        plugins: { legend:{ position:'bottom', labels:{ usePointStyle:true, padding:14 } },
+          tooltip: { callbacks: { label: c => { const t = counts.RED+counts.AMBER+counts.GREEN; const pct = t? ((c.parsed/t)*100).toFixed(0):0; return `${c.label}: ${c.parsed} zones (${pct}%)`; } } } } }
+    });
+  }
+
+  renderStackedChart() {
+    const top = this.top10();
+    const w1 = this.weightDeficit;
+    const labels = top.map(r => r.businessPark || (r.pc4 + ' ' + r.municipality));
+    const deficitPart = top.map(r => r.deficitScore * w1);
+    const congestionPart = top.map(r => r.congestionScore * (1 - w1));
+    if (this.charts.stacked) this.charts.stacked.destroy();
+    this.charts.stacked = new Chart(document.getElementById('stackedChart').getContext('2d'), {
+      type:'bar',
+      data: { labels, datasets:[
+        { label:`Energy Deficit (${Math.round(w1*100)}%)`, data: deficitPart, backgroundColor:'#4472C4', borderRadius:3 },
+        { label:`Grid Urgency (${Math.round((1-w1)*100)}%)`, data: congestionPart, backgroundColor:'#8172B3', borderRadius:3 },
+      ]},
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins: { legend:{ position:'top', labels:{ usePointStyle:true } } },
+        scales: { x:{ stacked:true, ticks:{ autoSkip:false, maxRotation:35, minRotation:35, font:{size:10} } }, y:{ stacked:true, beginAtZero:true, max:1 } } }
+    });
+  }
+
+  renderMunicipalityChart() {
+    const labels = this.municipalityBalance.map(m => m.municipality);
+    if (this.charts.muni) this.charts.muni.destroy();
+    this.charts.muni = new Chart(document.getElementById('municipalityChart').getContext('2d'), {
+      type:'bar',
+      data: { labels, datasets:[
+        { label:'Demand', data:this.municipalityBalance.map(m=>m.demandGwh), backgroundColor:'#C0392B99', borderRadius:3 },
+        { label:'Local Supply', data:this.municipalityBalance.map(m=>m.supplyGwh), backgroundColor:'#27964D99', borderRadius:3 },
+      ]},
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ position:'top', labels:{usePointStyle:true} } },
+        scales:{ y:{ beginAtZero:true, title:{ display:true, text:'GWh / year' } } } }
+    });
+  }
+
+  renderSelfSuffChart() {
+    const labels = this.municipalityBalance.map(m => m.municipality);
+    const vals = this.municipalityBalance.map(m => m.selfSufficiencyPct);
+    if (this.charts.selfsuff) this.charts.selfsuff.destroy();
+    this.charts.selfsuff = new Chart(document.getElementById('selfSuffChart').getContext('2d'), {
+      type:'bar',
+      data: { labels, datasets:[{ label:'Self-sufficiency %', data:vals, backgroundColor: vals.map(v=> v>50?'#27964D':(v>20?'#D68910':'#C0392B')), borderRadius:4 }] },
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false },
+          tooltip:{ callbacks:{ label: c => `${c.parsed.y.toFixed(1)}%` } } },
+        scales:{ y:{ beginAtZero:true, max:100, title:{ display:true, text:'% of demand' } } } }
+    });
+  }
+
+  renderMap() {
+    const map = L.map('map').setView([52.05, 5.58], 10.3);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap contributors', maxZoom:18 }).addTo(map);
+    const maxDeficit = Math.max(...this.geo.map(g => Math.abs(Math.min(g.netBalanceGwh,0))));
+    this.geo.forEach(g => {
+      const deficit = Math.abs(Math.min(g.netBalanceGwh, 0));
+      const radius = 5 + (deficit / maxDeficit) * 20;
+      const color = OPP_COLORS[g.h2OpportunityType] || '#999';
+      const marker = L.circleMarker([g.lat, g.lon], {
+        radius, color, fillColor: color, fillOpacity: g.anomaly ? 0.25 : 0.65, weight: g.anomaly ? 1 : 2, dashArray: g.anomaly ? '4,3' : null,
+      }).addTo(map);
+      marker.bindPopup(`<b>${g.pc4} ${g.municipality}</b><br>Net balance: ${fmt(g.netBalanceGwh)} GWh<br>Supply ratio: ${fmt(g.supplyRatioPct)}%<br>Type: ${g.h2OpportunityType}${g.anomaly ? '<br><i>⚠ flagged anomaly</i>' : ''}`);
+    });
+    const legend = L.control({ position:'bottomright' });
+    legend.onAdd = function() {
+      const div = L.DomUtil.create('div', 'map-legend');
+      div.style.background = '#fff'; div.style.padding='8px 10px'; div.style.borderRadius='6px'; div.style.fontSize='11px'; div.style.boxShadow='0 1px 4px rgba(0,0,0,0.2)';
+      div.innerHTML = Object.entries(OPP_COLORS).map(([k,c]) => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;"><span style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block;"></span>${k}</div>`).join('');
+      return div;
+    };
+    legend.addTo(map);
+  }
+
+  bindSort() {
+    document.querySelectorAll('#detailTable thead th').forEach(th => {
+      th.addEventListener('click', () => {
+        const field = th.dataset.field;
+        if (this.sortField === field) this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+        else { this.sortField = field; this.sortDir = 'asc'; }
+        this.page = 0;
+        this.renderTable();
+      });
+    });
+  }
+
+  renderTable() {
+    const sorted = [...this.filtered].sort((a,b) => {
+      let av = a[this.sortField], bv = b[this.sortField];
+      if (av === null) av = -Infinity; if (bv === null) bv = -Infinity;
+      if (typeof av === 'string') { av = av.toLowerCase(); bv = (bv||'').toLowerCase(); }
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return this.sortDir === 'asc' ? cmp : -cmp;
+    });
+    const totalPages = Math.max(1, Math.ceil(sorted.length / this.pageSize));
+    if (this.page >= totalPages) this.page = totalPages - 1;
+    const start = this.page * this.pageSize;
+    const pageRows = sorted.slice(start, start + this.pageSize);
+
+    const tbody = document.getElementById('detailTableBody');
+    tbody.innerHTML = pageRows.map(r => `
+      <tr class="${r.liveRank <= 3 ? 'top3' : ''}">
+        <td>${r.liveRank}</td>
+        <td>${r.pc4}</td>
+        <td>${r.municipality}</td>
+        <td>${r.businessPark || '—'}</td>
+        <td>${fmt(r.demandSyntheticGwh)}</td>
+        <td>${fmt(r.totalSupplyGwh)}</td>
+        <td>${fmt(r.netBalanceP3Gwh)}</td>
+        <td><span class="badge ${r.congestionStatus}">${r.congestionStatus}</span></td>
+        <td><b>${r.liveScore.toFixed(3)}</b></td>
+      </tr>
+    `).join('');
+
+    document.getElementById('pager-info').textContent = `Showing ${start+1}-${Math.min(start+this.pageSize, sorted.length)} of ${sorted.length}`;
+    document.getElementById('pager-prev').disabled = this.page === 0;
+    document.getElementById('pager-next').disabled = this.page >= totalPages - 1;
+  }
+
+  prevPage() { if (this.page > 0) { this.page--; this.renderTable(); } }
+  nextPage() { this.page++; this.renderTable(); }
+}
+
+const dash = new Dashboard(DATA);
+</script>
+</body>
+</html>
