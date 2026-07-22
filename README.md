@@ -1,10 +1,12 @@
 # Hydrogen Hub Siting — Regio Foodvalley
 
+[![CI](https://github.com/beswayam/hydrogen-siting-foodvalley/actions/workflows/ci.yml/badge.svg)](https://github.com/beswayam/hydrogen-siting-foodvalley/actions/workflows/ci.yml)
+
 Open-source Python reproduction, robustness analysis, and interactive dashboard
 for a regional green-hydrogen siting study, extending a Wageningen University
 Academic Consultancy Training (ACT) report I co-authored.
 
-**[Read the case study](CASE_STUDY.md)** · **[Open the interactive dashboard](dashboard/index.html)**
+**[Read the case study](CASE_STUDY.md)** · **[Open the live interactive dashboard](https://beswayam.github.io/hydrogen-siting-foodvalley/)**
 
 ## Problem
 
@@ -47,7 +49,7 @@ any energy-deficit weighting between **47% and 100%** — but a congestion-domin
 weighting (e.g. an objectively-derived CRITIC weighting, 28%/72%) flips the #1
 recommendation to **PC4 3901 (Nijverkamp, Veenendaal)**, the only officially
 RED-congested top candidate. See [`figures/sensitivity_weight_stability.png`](figures/sensitivity_weight_stability.png)
-or explore it live in the [dashboard](dashboard/index.html).
+or explore it live in the **[hosted dashboard](https://beswayam.github.io/hydrogen-siting-foodvalley/)**.
 
 ## What's in this repo
 

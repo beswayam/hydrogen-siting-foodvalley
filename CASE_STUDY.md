@@ -47,6 +47,14 @@ government progress report to within 0.4%; our bottom-up demand estimates
 matched 180 physically-metered substations at R²=0.998; our solar-park
 inventory matched an independent prior study's inventory exactly.
 
+**My specific contribution** within the team: I worked on the quantitative
+data pipeline and scoring model (the Python code behind the PC4-level energy
+balance and MCA1 composite score — the same logic this repo's `src/pipeline.py`
+later reproduces from raw data), conducted several of the 11 stakeholder
+interviews, and contributed to writing and coordinating the final report. The
+PC6-level GIS work in ArcGIS Pro and the remaining interviews were led by
+other team members — credited above, not claimed here.
+
 ## Result
 
 Two locations stood out: **Harselaar (Barneveld)** — adjacent to an existing
